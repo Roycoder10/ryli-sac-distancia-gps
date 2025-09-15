@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RyLi SAC - Análisis de Ruta</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .text-area-container {
+            position: relative;
+        }
+        .text-area-placeholder {
+            position: absolute;
+            top: 0.75rem;
+            left: 1rem;
+            color: #9ca3af;
+            pointer-events: none;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        textarea:focus + .text-area-placeholder,
+        textarea:not(:placeholder-shown) + .text-area-placeholder {
+            transform: translateY(-1.25rem) scale(0.85);
+            opacity: 0;
+        }
+        .results-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        .summary-table th, .summary-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .summary-table th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            color: #4a5568;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-200">
+
+<div class="container">
+    <div class="flex justify-center items-center gap-6 mb-6">
+        <img src="https://placehold.co/100x100/1e40af/ffffff?text=RyLi+SAC" alt="Logo de RyLi SAC" class="w-16 h-16 rounded-full shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800">RyLi SAC - Análisis de Ruta</h1>
+        <img src="https://placehold.co/100x100/3b82f6/ffffff?text=GPS" alt="Dispositivo GPS" class="w-16 h-16 rounded-full shadow-lg">
+    </div>
+    
+    <p class="text-center text-gray-600 mb-6">Ingresa los datos en el formato: <code class="bg-gray-100 p-1 rounded-md text-sm">fecha hora latitud longitud ubicación velocidad</code>, una entrada por línea.</p>
+    
+    <div class="text-area-container mb-6">
+        <textarea id="dataInput" rows="10" placeholder=" " class="w-full p-4 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y"></textarea>
+        <label for="dataInput" class="text-area-placeholder text-gray-400">Ejemplo:
+31/08/2025 22:10:57 -12.0298916 -77.0427916 RIMAC/LIMA/LIMA 15 km/h
+31/08/2025 22:12:05 -12.0299500 -77.0427800 RIMAC/LIMA/LIMA 12 km/h
+01/09/2025 08:30:15 -12.0305000 -77.0427700 RIMAC/LIMA/LIMA 0 km/h
+01/09/2025 08:31:00 -12.0305000 -77.0427700 RIMAC/LIMA/LIMA 0 km/h</label>
+    </div>
+
+    <button onclick="analyzeData()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all">
+        Analizar Datos
+    </button>
+
+    <div id="results" class="mt-8 results-container"></div>
+
+    <div id="error" class="mt-4 text-center text-red-500 hidden">
+        <p>Hubo un error al procesar los datos. Asegúrate de que el formato sea correcto y que hayas ingresado al menos dos puntos para cada día.</p>
+    </div>
+</div>
+
+<script>
+    function toRadians(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radio de la Tierra en kilómetros
+
+        const lat1Rad = toRadians(lat1);
+        const lat2Rad = toRadians(lat2);
+        const deltaLat = toRadians(lat2 - lat1);
+        const deltaLon = toRadians(lon2 - lon1);
+
+        const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+                  Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+                  Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    }
+
+    function analyzeData() {
+        const input = document.getElementById('dataInput').value;
+        const resultsDiv = document.getElementById('results');
+        const errorDiv = document.getElementById('error');
+        
+        resultsDiv.innerHTML = '';
+        errorDiv.classList.add('hidden');
+
+        const lines = input.trim().split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        const dataByDate = {};
+        let grandTotalDistance = 0;
+        let summaryTableContent = '';
+
+        try {
+            lines.forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                
+                // Mínimo de 6 partes: fecha, hora, lat, lon, ubicación, velocidad, "km/h"
+                if (parts.length < 6) {
+                    throw new Error("Formato de línea incorrecto");
+                }
+
+                const date = parts[0];
+                const time = parts[1];
+                const lat = parseFloat(parts[2]);
+                const lon = parseFloat(parts[3]);
+                const speed = parseFloat(parts[parts.length - 2]);
+
+                // Asume que el nombre de la ubicación es todo lo que está entre lon y velocidad
+                const locationParts = parts.slice(4, parts.length - 2);
+                const location = locationParts.join(' ');
+                
+                if (isNaN(lat) || isNaN(lon) || isNaN(speed)) {
+                    throw new Error("Valores numéricos inválidos");
+                }
+
+                const dataPoint = { date, time, lat, lon, location, speed };
+
+                if (!dataByDate[date]) {
+                    dataByDate[date] = [];
+                }
+                dataByDate[date].push(dataPoint);
+            });
+
+            // Sort data points within each date by time
+            for (const date in dataByDate) {
+                dataByDate[date].sort((a, b) => {
+                    const timeA = new Date(`1970/01/01 ${a.time}`);
+                    const timeB = new Date(`1970/01/01 ${b.time}`);
+                    return timeA - timeB;
+                });
+            }
+
+            for (const date in dataByDate) {
+                const dailyData = dataByDate[date];
+                if (dailyData.length < 2) continue;
+
+                let totalDistance = 0;
+                let totalStoppedTime = 0;
+                let totalMovingTime = 0;
+
+                for (let i = 0; i < dailyData.length - 1; i++) {
+                    const current = dailyData[i];
+                    const next = dailyData[i + 1];
+                    const timeDiff = (new Date(`1970/01/01 ${next.time}`) - new Date(`1970/01/01 ${current.time}`)) / 1000 / 60; // en minutos
+
+                    if (current.lat !== next.lat || current.lon !== next.lon) {
+                        const segmentDistance = haversineDistance(current.lat, current.lon, next.lat, next.lon);
+                        totalDistance += segmentDistance;
+                        if (current.speed > 0) {
+                            totalMovingTime += timeDiff;
+                        }
+                    } else {
+                        totalStoppedTime += timeDiff;
+                    }
+                }
+                grandTotalDistance += totalDistance;
+
+                const avgSpeed = totalMovingTime > 0 ? (totalDistance / (totalMovingTime / 60)) : 0; // km/h
+
+                summaryTableContent += `
+                    <tr class="hover:bg-gray-100 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">${date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${totalDistance.toFixed(2)} km</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${avgSpeed.toFixed(2)} km/h</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${(totalStoppedTime / 60).toFixed(2)} horas</td>
+                    </tr>
+                `;
+            }
+
+            const grandTotalDiv = document.createElement('div');
+            grandTotalDiv.className = 'text-center mb-8 p-6 bg-blue-100 rounded-lg border border-blue-200 shadow-md';
+            grandTotalDiv.innerHTML = `<h2 class="text-3xl font-extrabold text-blue-800 mb-2">Recorrido Total General</h2><p class="text-4xl font-extrabold text-blue-600">${grandTotalDistance.toFixed(2)} km</p>`;
+            resultsDiv.prepend(grandTotalDiv);
+
+            const summaryTableDiv = document.createElement('div');
+            summaryTableDiv.className = 'mt-8';
+            summaryTableDiv.innerHTML = `
+                <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">Resumen por Día</h2>
+                <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
+                    <table class="summary-table min-w-full divide-y divide-gray-200 bg-white">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distancia</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocidad Promedio</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo Detenido</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            ${summaryTableContent}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            resultsDiv.appendChild(summaryTableDiv);
+
+            if (resultsDiv.innerHTML === '') {
+                 throw new Error("No hay datos suficientes para calcular.");
+            }
+
+        } catch (e) {
+            console.error(e);
+            errorDiv.classList.remove('hidden');
+        }
+    }
+</script>
+
+</body>
+</html>
