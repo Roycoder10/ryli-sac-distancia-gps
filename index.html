@@ -3,34 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trucking SAC - Análisis de Ruta de transporte</title>
+    <title>Wilder Roy Llacchua Iman SAC - App Web</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #e2e8f0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 1rem;
+            background-color: #f1f5f9;
         }
         .container {
-            max-width: 700px;
-            width: 100%;
+            max-width: 900px;
+            margin: 2rem auto;
             background-color: #ffffff;
+            padding: 2rem;
             border-radius: 1.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            padding: 2.5rem;
-            border: 1px solid #e2e8f0;
         }
         .text-area-container {
             position: relative;
         }
         .text-area-placeholder {
             position: absolute;
-            top: 0.75rem;
+            top: 1rem;
             left: 1rem;
             color: #9ca3af;
             pointer-events: none;
@@ -41,60 +36,99 @@
             transform: translateY(-1.25rem) scale(0.85);
             opacity: 0;
         }
-        .results-container {
-            max-height: 400px;
-            overflow-y: auto;
+        #map { 
+            height: 400px; 
+            width: 100%; 
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 1.5rem;
         }
-        .summary-table {
+        .chart-container {
+            position: relative;
             width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-        .summary-table th, .summary-table td {
-            padding: 0.75rem;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .summary-table th {
-            background-color: #f1f5f9;
-            font-weight: 600;
-            color: #4a5568;
-            text-transform: uppercase;
-            font-size: 0.875rem;
+            height: 300px;
+            margin-top: 2rem;
         }
     </style>
 </head>
 <body class="bg-gray-200">
 
 <div class="container">
-    <div class="flex justify-center items-center gap-6 mb-6">
+    <div class="flex flex-col items-center gap-4 mb-6">
         <img src="https://placehold.co/100x100/1e40af/ffffff?text=RyLi+SAC" alt="Logo de RyLi SAC" class="w-16 h-16 rounded-full shadow-lg">
-        <h1 class="text-3xl font-bold text-center text-gray-800">RyLi SAC - Análisis de Ruta</h1>
-        <img src="https://placehold.co/100x100/3b82f6/ffffff?text=GPS" alt="Dispositivo GPS" class="w-16 h-16 rounded-full shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800">Análisis de Ruta</h1>
+        <p class="text-center text-gray-600">Ingresa los datos del GPS a continuación.</p>
     </div>
     
-    <p class="text-center text-gray-600 mb-6">Ingresa los datos en el formato: <code class="bg-gray-100 p-1 rounded-md text-sm">fecha hora latitud longitud ubicación velocidad</code>, una entrada por línea.</p>
-    
-    <div class="text-area-container mb-6">
+    <div class="text-area-container mb-4">
         <textarea id="dataInput" rows="10" placeholder=" " class="w-full p-4 text-gray-700 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y"></textarea>
-        <label for="dataInput" class="text-area-placeholder text-gray-400">Ejemplo:
+        <label for="dataInput" class="text-area-placeholder text-gray-400">
+Ejemplo:
 31/08/2025 22:10:57 -12.0298916 -77.0427916 RIMAC/LIMA/LIMA 15 km/h
 31/08/2025 22:12:05 -12.0299500 -77.0427800 RIMAC/LIMA/LIMA 12 km/h
-01/09/2025 08:30:15 -12.0305000 -77.0427700 RIMAC/LIMA/LIMA 0 km/h
-01/09/2025 08:31:00 -12.0305000 -77.0427700 RIMAC/LIMA/LIMA 0 km/h</label>
+...
+</label>
     </div>
 
-    <button onclick="analyzeData()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all">
-        Analizar Datos
-    </button>
+    <!-- Filtro de rango de fecha y hora -->
+    <div class="mb-6">
+        <h3 class="text-lg font-bold text-gray-700 mb-2">Filtrar por rango (opcional)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label for="startDateFilter" class="block text-sm font-medium text-gray-700">Fecha de inicio</label>
+                <input type="date" id="startDateFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            </div>
+            <div>
+                <label for="endDateFilter" class="block text-sm font-medium text-gray-700">Fecha de fin</label>
+                <input type="date" id="endDateFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            </div>
+            <div>
+                <label for="startTimeFilter" class="block text-sm font-medium text-gray-700">Hora de inicio</label>
+                <input type="time" id="startTimeFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            </div>
+            <div>
+                <label for="endTimeFilter" class="block text-sm font-medium text-gray-700">Hora de fin</label>
+                <input type="time" id="endTimeFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
+            </div>
+        </div>
+    </div>
 
-    <div id="results" class="mt-8 results-container"></div>
+    <div class="flex flex-col md:flex-row gap-4 mb-8">
+        <button onclick="analyzeData()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all text-lg">
+            Analizar Datos
+        </button>
+        <div class="grid grid-cols-2 gap-4 w-full">
+            <button onclick="exportToCSV()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all">
+                Exportar CSV
+            </button>
+            <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-all">
+                Exportar PDF
+            </button>
+        </div>
+    </div>
 
-    <div id="error" class="mt-4 text-center text-red-500 hidden">
-        <p>Hubo un error al procesar los datos. Asegúrate de que el formato sea correcto y que hayas ingresado al menos dos puntos para cada día.</p>
+    <div id="results" class="results-container">
+        <div id="error" class="mt-4 text-center text-red-500 hidden">
+            <p id="error-message">Hubo un error al procesar los datos. Asegúrate de que el formato sea correcto y que hayas ingresado al menos dos puntos para cada día.</p>
+        </div>
     </div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
+    let mapInstance = null;
+
+    // Helper function to format time from minutes to "X horas Y minutos"
+    function formatTime(minutes) {
+        if (minutes < 0) return "0 horas 0 minutos";
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = Math.round(minutes % 60);
+        return `${hours} horas ${remainingMinutes} minutos`;
+    }
+
     function toRadians(degrees) {
         return degrees * Math.PI / 180;
     }
@@ -117,27 +151,78 @@
 
     function analyzeData() {
         const input = document.getElementById('dataInput').value;
+        const startDateFilter = document.getElementById('startDateFilter').value;
+        const endDateFilter = document.getElementById('endDateFilter').value;
+        const startTimeFilter = document.getElementById('startTimeFilter').value;
+        const endTimeFilter = document.getElementById('endTimeFilter').value;
         const resultsDiv = document.getElementById('results');
         const errorDiv = document.getElementById('error');
+        const errorMessage = document.getElementById('error-message');
         
-        resultsDiv.innerHTML = '';
+        resultsDiv.innerHTML = `<div id="error" class="mt-4 text-center text-red-500 hidden"><p id="error-message">Hubo un error al procesar los datos. Asegúrate de que el formato sea correcto y que hayas ingresado al menos dos puntos para cada día.</p></div>`;
         errorDiv.classList.add('hidden');
 
-        const lines = input.trim().split('\n').filter(line => line.trim() !== '');
+        let lines = input.trim().split('\n').filter(line => line.trim() !== '');
+
+        if (lines.length === 0) {
+            errorMessage.innerText = "Por favor, introduce datos en el campo de texto.";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        // Validación y filtrado del rango de fecha y hora de forma combinada
+        if (startDateFilter || endDateFilter || startTimeFilter || endTimeFilter) {
+            const startDateTime = new Date(
+                (startDateFilter || '1970-01-01') + 'T' + (startTimeFilter || '00:00') + ':00'
+            );
+            const endDateTime = new Date(
+                (endDateFilter || '2099-12-31') + 'T' + (endTimeFilter || '23:59') + ':59'
+            );
+
+            if (startDateTime > endDateTime) {
+                errorMessage.innerText = "La fecha y hora de inicio no pueden ser posteriores a la de fin.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            lines = lines.filter(line => {
+                const parts = line.split(/\s+/);
+                const rawDate = parts[0];
+                const time = parts[1];
+                
+                const dateParts = rawDate.split('/');
+                const currentDateTime = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}T${time}`);
+
+                return currentDateTime >= startDateTime && currentDateTime <= endDateTime;
+            });
+        }
+
         if (lines.length < 2) {
+            errorMessage.innerText = "No se encontraron suficientes puntos de datos que coincidan con los filtros aplicados. Se requieren al menos dos puntos.";
             errorDiv.classList.remove('hidden');
             return;
         }
 
         const dataByDate = {};
         let grandTotalDistance = 0;
+        let grandTotalOperatingTime = 0;
+        let grandTotalStoppedTime = 0;
         let summaryTableContent = '';
+        let eventsContent = '';
+
+        const SPEED_LIMIT = 96;
+        const ACCELERATION_THRESHOLD = 20; // km/h por minuto
+        const DECELERATION_THRESHOLD = -20; // km/h por minuto
+        
+        const allLatLngs = [];
+        const speedData = [];
+        const distanceData = [];
+        let accumulatedDistance = 0;
 
         try {
             lines.forEach(line => {
                 const parts = line.trim().split(/\s+/);
                 
-                // Mínimo de 6 partes: fecha, hora, lat, lon, ubicación, velocidad, "km/h"
                 if (parts.length < 6) {
                     throw new Error("Formato de línea incorrecto");
                 }
@@ -148,7 +233,6 @@
                 const lon = parseFloat(parts[3]);
                 const speed = parseFloat(parts[parts.length - 2]);
 
-                // Asume que el nombre de la ubicación es todo lo que está entre lon y velocidad
                 const locationParts = parts.slice(4, parts.length - 2);
                 const location = locationParts.join(' ');
                 
@@ -162,41 +246,87 @@
                     dataByDate[date] = [];
                 }
                 dataByDate[date].push(dataPoint);
-            });
+                
+                allLatLngs.push([lat, lon]);
 
-            // Sort data points within each date by time
-            for (const date in dataByDate) {
-                dataByDate[date].sort((a, b) => {
-                    const timeA = new Date(`1970/01/01 ${a.time}`);
-                    const timeB = new Date(`1970/01/01 ${b.time}`);
-                    return timeA - timeB;
-                });
-            }
+                const dateParts = date.split('/');
+                const timeParts = time.split(':');
+                const timestamp = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2]).getTime();
+                
+                speedData.push({ x: timestamp, y: speed });
+            });
 
             for (const date in dataByDate) {
                 const dailyData = dataByDate[date];
                 if (dailyData.length < 2) continue;
 
+                dailyData.sort((a, b) => {
+                    const dateA = new Date(a.date.split('/')[2], a.date.split('/')[1] - 1, a.date.split('/')[0], a.time.split(':')[0], a.time.split(':')[1], a.time.split(':')[2]);
+                    const dateB = new Date(b.date.split('/')[2], b.date.split('/')[1] - 1, b.date.split('/')[0], b.time.split(':')[0], b.time.split(':')[1], b.time.split(':')[2]);
+                    return dateA - dateB;
+                });
+
                 let totalDistance = 0;
                 let totalStoppedTime = 0;
                 let totalMovingTime = 0;
+                let excessiveSpeedCount = 0;
+                let harshAccelerationCount = 0;
+                let harshBrakingCount = 0;
+                
+                eventsContent += `
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">Eventos detectados el ${date}</h3>
+                        <ul class="list-disc pl-6 text-gray-600 mb-4">
+                `;
 
                 for (let i = 0; i < dailyData.length - 1; i++) {
                     const current = dailyData[i];
                     const next = dailyData[i + 1];
-                    const timeDiff = (new Date(`1970/01/01 ${next.time}`) - new Date(`1970/01/01 ${current.time}`)) / 1000 / 60; // en minutos
+                    const timeDiff = (new Date(next.date.split('/')[2], next.date.split('/')[1] - 1, next.date.split('/')[0], next.time.split(':')[0], next.time.split(':')[1], next.time.split(':')[2]) - new Date(current.date.split('/')[2], current.date.split('/')[1] - 1, current.date.split('/')[0], current.time.split(':')[0], current.time.split(':')[1], current.time.split(':')[2])) / 1000 / 60; // en minutos
 
-                    if (current.lat !== next.lat || current.lon !== next.lon) {
+                    // Lógica para determinar el tiempo detenido basada en la velocidad
+                    if (current.speed === 0) {
+                        totalStoppedTime += timeDiff;
+                    } else {
                         const segmentDistance = haversineDistance(current.lat, current.lon, next.lat, next.lon);
                         totalDistance += segmentDistance;
-                        if (current.speed > 0) {
-                            totalMovingTime += timeDiff;
-                        }
-                    } else {
-                        totalStoppedTime += timeDiff;
+                        accumulatedDistance += segmentDistance;
+                        totalMovingTime += timeDiff;
                     }
+
+                    if (current.speed > SPEED_LIMIT) {
+                        excessiveSpeedCount++;
+                        eventsContent += `<li class="text-red-500">⚠ **Exceso de velocidad** (${current.speed} km/h) a las ${current.time} en ${current.location}</li>`;
+                    }
+
+                    const speedChange = next.speed - current.speed;
+                    if (timeDiff > 0) {
+                        const speedChangePerMinute = speedChange / timeDiff;
+                        if (speedChangePerMinute > ACCELERATION_THRESHOLD) {
+                            harshAccelerationCount++;
+                            eventsContent += `<li class="text-red-500">⚠ **Aceleración brusca** (cambio de ${speedChange.toFixed(2)} km/h) a las ${current.time}</li>`;
+                        } else if (speedChangePerMinute < DECELERATION_THRESHOLD) {
+                            harshBrakingCount++;
+                            eventsContent += `<li class="text-red-500">⚠ **Frenado brusco** (cambio de ${speedChange.toFixed(2)} km/h) a las ${current.time}</li>`;
+                        }
+                    }
+                    
+                    const nextDateParts = next.date.split('/');
+                    const nextTimeParts = next.time.split(':');
+                    const nextTimestamp = new Date(nextDateParts[2], nextDateParts[1] - 1, nextDateParts[0], nextTimeParts[0], nextTimeParts[1], nextTimeParts[2]).getTime();
+
+                    distanceData.push({ x: nextTimestamp, y: accumulatedDistance });
                 }
+
+                if (excessiveSpeedCount > 0 || harshAccelerationCount > 0 || harshBrakingCount > 0) {
+                    eventsContent += `</ul></div>`;
+                } else {
+                    eventsContent += `<li class="text-green-500">✅ Sin eventos de riesgo detectados.</li></ul></div>`;
+                }
+
                 grandTotalDistance += totalDistance;
+                grandTotalOperatingTime += totalMovingTime;
+                grandTotalStoppedTime += totalStoppedTime;
 
                 const avgSpeed = totalMovingTime > 0 ? (totalDistance / (totalMovingTime / 60)) : 0; // km/h
 
@@ -205,49 +335,264 @@
                         <td class="px-6 py-4 whitespace-nowrap">${date}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${totalDistance.toFixed(2)} km</td>
                         <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${avgSpeed.toFixed(2)} km/h</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${(totalStoppedTime / 60).toFixed(2)} horas</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">${formatTime(totalStoppedTime)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-red-500 font-semibold">${excessiveSpeedCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-red-500 font-semibold">${harshAccelerationCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-red-500 font-semibold">${harshBrakingCount}</td>
                     </tr>
                 `;
             }
 
-            const grandTotalDiv = document.createElement('div');
-            grandTotalDiv.className = 'text-center mb-8 p-6 bg-blue-100 rounded-lg border border-blue-200 shadow-md';
-            grandTotalDiv.innerHTML = `<h2 class="text-3xl font-extrabold text-blue-800 mb-2">Recorrido Total General</h2><p class="text-4xl font-extrabold text-blue-600">${grandTotalDistance.toFixed(2)} km</p>`;
-            resultsDiv.prepend(grandTotalDiv);
+            if (Object.keys(dataByDate).length === 0) {
+                errorMessage.innerText = "No se encontraron datos que coincidan con los filtros aplicados. Por favor, revisa tus criterios de búsqueda.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            // Calculo del tiempo total de la ruta
+            const grandTotalTripTime = grandTotalOperatingTime + grandTotalStoppedTime;
 
-            const summaryTableDiv = document.createElement('div');
-            summaryTableDiv.className = 'mt-8';
-            summaryTableDiv.innerHTML = `
-                <h2 class="text-2xl font-bold text-gray-700 mb-4 text-center">Resumen por Día</h2>
-                <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
-                    <table class="summary-table min-w-full divide-y divide-gray-200 bg-white">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distancia</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocidad Promedio</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo Detenido</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            ${summaryTableContent}
-                        </tbody>
-                    </table>
+            resultsDiv.innerHTML = `
+                <div id="summary-section">
+                    <div class="text-center mb-8 p-6 bg-blue-100 rounded-lg border border-blue-200 shadow-md">
+                        <h2 class="text-xl font-extrabold text-blue-800 mb-2">Resumen General</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-left">
+                            <div class="bg-blue-200 p-4 rounded-lg shadow-inner">
+                                <p class="text-xs font-semibold text-blue-900">Recorrido Total</p>
+                                <p class="text-xl font-extrabold text-blue-600">${grandTotalDistance.toFixed(2)} km</p>
+                            </div>
+                            <div class="bg-blue-200 p-4 rounded-lg shadow-inner">
+                                <p class="text-xs font-semibold text-blue-900">Tiempo en Operación</p>
+                                <p class="text-xl font-extrabold text-blue-600">${formatTime(grandTotalOperatingTime)}</p>
+                            </div>
+                            <div class="bg-blue-200 p-4 rounded-lg shadow-inner">
+                                <p class="text-xs font-semibold text-blue-900">Tiempo Detenido</p>
+                                <p class="text-xl font-extrabold text-blue-600">${formatTime(grandTotalStoppedTime)}</p>
+                            </div>
+                            <div class="bg-blue-200 p-4 rounded-lg shadow-inner">
+                                <p class="text-xs font-semibold text-blue-900">Tiempo Total de la Ruta</p>
+                                <p class="text-xl font-extrabold text-blue-600">${formatTime(grandTotalTripTime)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8">
+                        <h2 class="text-xl font-bold text-gray-700 mb-4 text-center">Resumen por Día</h2>
+                        <div class="overflow-x-auto rounded-lg shadow-md border border-gray-200">
+                            <table class="summary-table min-w-full divide-y divide-gray-200 bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dist.</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vel. Prom.</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiempo Det.</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Excesos</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acelerones</th>
+                                        <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frenadas</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    ${summaryTableContent}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="visualizations-section">
+                    <h2 class="text-xl font-bold text-gray-700 mt-8 mb-4 text-center">Visualizaciones de la Ruta</h2>
+                    <div id="map"></div>
+                    
+                    <div class="chart-container">
+                        <canvas id="speedChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="distanceChart"></canvas>
+                    </div>
+                </div>
+                
+                <h2 class="text-xl font-bold text-gray-700 mt-8 mb-4 text-center">Detalle de Eventos de Riesgo</h2>
+                <div class="p-4 bg-gray-100 rounded-lg shadow-inner">
+                    ${eventsContent}
                 </div>
             `;
-            resultsDiv.appendChild(summaryTableDiv);
-
-            if (resultsDiv.innerHTML === '') {
-                 throw new Error("No hay datos suficientes para calcular.");
+            
+            if (allLatLngs.length > 0) {
+              renderMap(allLatLngs);
             }
+
+            if (speedData.length > 0 && distanceData.length > 0) {
+              renderCharts(speedData, distanceData);
+            }
+
 
         } catch (e) {
             console.error(e);
+            errorMessage.innerText = "Hubo un error al procesar los datos. Asegúrate de que el formato sea correcto y que hayas ingresado al menos dos puntos para cada día.";
             errorDiv.classList.remove('hidden');
         }
+    }
+
+    function renderMap(latLngs) {
+        if (mapInstance) {
+            mapInstance.remove();
+        }
+        
+        mapInstance = L.map('map').setView(latLngs[0], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapInstance);
+        
+        const polyline = L.polyline(latLngs, {color: 'blue'}).addTo(mapInstance);
+        mapInstance.fitBounds(polyline.getBounds());
+        
+        L.marker(latLngs[0]).addTo(mapInstance)
+            .bindPopup('<b>Inicio</b>').openPopup();
+        L.marker(latLngs[latLngs.length - 1]).addTo(mapInstance)
+            .bindPopup('<b>Fin</b>').openPopup();
+    }
+
+    function renderCharts(speedData, distanceData) {
+        const speedCtx = document.getElementById('speedChart').getContext('2d');
+        const distanceCtx = document.getElementById('distanceChart').getContext('2d');
+        
+        // Destruye los gráficos existentes para evitar duplicados
+        if (window.speedChartInstance) window.speedChartInstance.destroy();
+        if (window.distanceChartInstance) window.distanceChartInstance.destroy();
+
+        window.speedChartInstance = new Chart(speedCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Velocidad (km/h)',
+                    data: speedData,
+                    borderColor: '#1d4ed8',
+                    backgroundColor: 'rgba(29, 78, 216, 0.1)',
+                    tension: 0.1,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Tiempo'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Velocidad (km/h)'
+                        }
+                    }
+                }
+            }
+        });
+
+        window.distanceChartInstance = new Chart(distanceCtx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Distancia Acumulada (km)',
+                    data: distanceData,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.1,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Tiempo'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Distancia (km)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function exportToCSV() {
+        const table = document.querySelector('.summary-table');
+        if (!table) {
+            // Reemplaza alert con un mensaje en la UI
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div id="error" class="mt-4 text-center text-red-500"><p id="error-message">No hay datos para exportar. Por favor, realiza un análisis primero.</p></div>`;
+            return;
+        }
+
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+
+        for (const row of rows) {
+            const cols = row.querySelectorAll('th, td');
+            const rowData = [];
+            for (const col of cols) {
+                rowData.push(col.innerText);
+            }
+            csv.push(rowData.join(';'));
+        }
+
+        const csvString = csv.join('\n');
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', 'analisis_ruta_resumen.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+    
+    function exportToPDF() {
+        const { jsPDF } = window.jspdf;
+        const results = document.getElementById('results');
+        if (!results.querySelector('.summary-table')) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div id="error" class="mt-4 text-center text-red-500"><p id="error-message">No hay datos para exportar. Por favor, realiza un análisis primero.</p></div>`;
+            return;
+        }
+
+        const loader = document.createElement('div');
+        loader.innerText = 'Generando PDF...';
+        loader.className = 'fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center text-xl font-bold z-50';
+        document.body.appendChild(loader);
+
+        html2canvas(results, { scale: 2 }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save('analisis_ruta.pdf');
+            document.body.removeChild(loader);
+        });
     }
 </script>
 
 </body>
 </html>
-
